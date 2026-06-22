@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Esperto Botanico Forestale</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --primary-light: #e8f5e9;
+            --text: #333;
+            --bg: #f5f5f5;
+            --accent: #e65100;
+            --btn-report: #1565c0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            font-size: 24px;
+            margin-top: 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: #e0e0e0;
+            color: #333;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .sezione {
+            display: none;
+        }
+
+        .sezione.active {
+            display: block;
+        }
+
+        .select-box {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .select-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        select {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            font-size: 15px;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            background: white;
+            outline: none;
+        }
+
+        .azione-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: var(--primary);
+            color: white;
+            width: 35%;
+        }
+
+        tr.differenza { background-color: #fff3e0; }
+        tr.uguale { background-color: var(--primary-light); color: #666; }
+
+        .badge-diff {
+            background: var(--accent);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 4px;
+        }
+
+        .img-botanica {
+            display: block;
+            width: 100%;
+            max-width: 180px;
+            height: auto;
+            margin-top: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background-color: #eee;
+        }
+
+        .griglia-filtri {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+
+        .card-risultato {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: white;
+            display: flex;
+            gap: 15px;
+        }
+
+        .card-risultato h4 {
+            margin: 0 0 5px 0;
+            color: var(--primary);
+        }
+
+        .badge-match {
+            background: var(--primary);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .btn-esporta {
+            background-color: var(--btn-report);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .btn-esporta:hover {
+            background-color: #0d47a1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Sistema Esperto Botanico</h1>
+    
+    <div class="tabs">
+        <button id="btn-tab-confronto" class="tab-btn active" onclick="cambiaTab('confronto')">Confronto Diretto</button>
+        <button id="btn-tab-identificazione" class="tab-btn" onclick="cambiaTab('identificazione')">Identificazione (Chiave)</button>
+    </div>
+
+    <div id="tab-confronto" class="sezione active">
+        <div class="select-box">
+            <div class="select-wrapper">
+                <label for="albero1">Specie 1:</label>
+                <select id="albero1"></select>
+            </div>
+            <div class="select-wrapper">
+                <label for="albero2">Specie 2:</label>
+                <select id="albero2"></select>
+            </div>
+        </div>
+
+        <button class="azione-btn" onclick="eseguiConfronto()">Confronta Specie</button>
+        <div id="risultato-confronto"></div>
+    </div>
+
+    <div id="tab-identificazione" class="sezione">
+        <h3>Identificazione in base ai caratteri osservati</h3>
+        
+        <div id="stato-caricamento" style="font-size: 13px; color: #e65100; font-weight: bold; margin-bottom: 8px;">🔄 Caricamento del file CSV in corso...</div>
+        <div id="contatore-risultati" class="badge-match">Calcolo specie...</div>
+        
+        <div class="griglia-filtri" style="margin-top: 15px;">
+            <div class="select-wrapper">
+                <label for="filtro-margine">Margine Foglia:</label>
+                <select id="filtro-margine" onchange="filtraSpecie()">
+                    <option value="TUTTI">-- Qualsiasi --</option>
+                    <option value="seghettato">Seghettato / Dentato</option>
+                    <option value="intero">Intero / Ondulato</option>
+                    <option value="lobato">Lobato</option>
+                </select>
+            </div>
+
+            <div class="select-wrapper">
+                <label for="filtro-disposizione">Disposizione Foglie:</label>
+                <select id="filtro-disposizione" onchange="filtraSpecie()">
+                    <option value="TUTTI">-- Qualsiasi --</option>
+                    <option value="alterne">Alterne</option>
+                    <option value="opposte">Opposte</option>
+                    <option value="isolati">Aghi isolati / Pettinati</option>
+                    <option value="coppie">Aghi in coppie / mazzetti</option>
+                </select>
+            </div>
+
+            <div class="select-wrapper">
+                <label for="filtro-corteccia">Tipo Corteccia:</label>
+                <select id="filtro-corteccia" onchange="filtraSpecie()">
+                    <option value="TUTTI">-- Qualsiasi --</option>
+                    <option value="fessurata">Fessurata / A placche</option>
+                    <option value="liscia">Liscia</option>
+                    <option value="squamosa">Squamosa</option>
+                    <option value="sugherosa">Sugherosa</option>
+                </select>
+            </div>
+
+            <div class="select-wrapper">
+                <label for="filtro-frutto">Tipo di Frutto:</label>
+                <select id="filtro-frutto" onchange="filtraSpecie()">
+                    <option value="TUTTI">-- Qualsiasi --</option>
+                    <option value="ghianda">Ghianda</option>
+                    <option value="pigna">Pigna (Cono)</option>
+                    <option value="samara">Samara / Disamara</option>
+                    <option value="riccio">Riccio spinoso</option>
+                    <option value="capsula">Capsula / Amenti</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="lista-identificati"></div>
+    </div>
+</div>
+
+<script>
+    let databaseAlberi = [];
+    
+    // Usiamo il metodo nativo Fetch per evitare i blocchi legati all'errore 304 della cache
+    fetch("alberi.csv?v=" + Date.now(), { cache: "no-store" })
+        .then(response => {
+            // Se il browser risponde con 304 o 200, la lettura è comunque valida!
+            if (!response.ok && response.status !== 304) {
+                throw new Error("Errore di rete o file non trovato");
+            }
+            return response.text();
+        })
+        .then(testoCSV => {
+            // Passiamo il testo estratto a PapaParse solo per convertirlo in oggetti
+            let risultati = Papa.parse(testoCSV, {
+                header: true,
+                skipEmptyLines: true
+            });
+            databaseAlberi = risultati.data;
+            inizializzaApplicazione();
+        })
+        .catch(err => {
+            document.getElementById('stato-caricamento').style.color = "red";
+            document.getElementById('stato-caricamento').textContent = "❌ Impossibile leggere alberi.csv. Avvia il server locale!";
+            console.error("Dettaglio errore:", err);
+        });
+    
+    function cambiaTab(tabId) {
+        document.querySelectorAll('.sezione').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById("tab-" + tabId).classList.add('active');
+        document.getElementById("btn-tab-" + tabId).classList.add('active');
+        
+        if(tabId === 'identificazione') {
+            filtraSpecie();
+        }
+    }
+    
+    function tendernessTrim(str) {
+        return (str || "").toLowerCase().trim();
+    }
+    
+    function inizializzaApplicazione() {
+        const select1 = document.getElementById('albero1');
+        const select2 = document.getElementById('albero2');
+        
+        if(!select1 || !select2) return;
+        
+        select1.innerHTML = "";
+        select2.innerHTML = "";
+    
+        databaseAlberi.forEach(albero => {
+            if(albero.id) {
+                let opt1 = document.createElement('option');
+                let opt2 = document.createElement('option');
+                opt1.value = opt2.value = albero.id.trim();
+                opt1.textContent = opt2.textContent = albero.nomeComune + " (" + albero.nomeScientifico + ")";
+                select1.appendChild(opt1);
+                select2.appendChild(opt2);
+            }
+        });
+        if(select2.options[1]) select2.selectedIndex = 1;
+        
+        document.getElementById('stato-caricamento').style.color = "#2e7d32";
+        document.getElementById('stato-caricamento').textContent = "✔ Database sincronizzato! (" + databaseAlberi.length + " specie pronte).";
+        
+        eseguiConfronto();
+        filtraSpecie();
+    }
+    
+    function eseguiConfronto() {
+        if(databaseAlberi.length === 0) return;
+
+        const select1 = document.getElementById('albero1');
+        const select2 = document.getElementById('albero2');
+        const divRisultato = document.getElementById('risultato-confronto');
+        
+        if(!select1 || !select2 || !divRisultato) return;
+
+        const sp1 = databaseAlberi.find(a => a.id && a.id.trim() === select1.value);
+        const sp2 = databaseAlberi.find(a => a.id && a.id.trim() === select2.value);
+
+        if (!sp1 || !sp2 || sp1.id === sp2.id) {
+            divRisultato.innerHTML = "<p style='color:red; text-align:center;'>Seleziona due specie diverse per il confronto!</p>";
+            return;
+        }
+
+        // MAPPATURA POTENZIATA: Ora include sia i testi che i tag di identificazione!
+        const mappatura = [
+            { etichetta: "Disposizione Foglie", colonna: "tagDisposizione" }, // <-- NUOVO
+            { etichetta: "Margine Fogliare", colonna: "tagMargine" },         // <-- NUOVO
+            { etichetta: "Tipo Corteccia", colonna: "tagCorteccia" },         // <-- NUOVO
+            { etichetta: "Tipo Frutto", colonna: "tagFrutto" },               // <-- NUOVO
+            { etichetta: "Descrizione Foglia", colonna: "descrizioneFoglia", folder: "foglie" },
+            { etichetta: "Dettaglio Foglia", colonna: "descrizioneFoglia", folder: "foglie_dettaglio" },
+            { etichetta: "Descrizione Corteccia", colonna: "descrizioneCorteccia", folder: "tronchi" },
+            { etichetta: "Descrizione Frutto", colonna: "descrizioneFrutto", folder: "frutti" },
+            { etichetta: "Portamento / Chioma", colonna: "descrizioneChioma", folder: "chiome" }
+        ];
+
+        let tabularHtml = "<h3>Tabella di confronto morfologico:</h3><table><thead><tr><th>Tratto Diagnostico</th><th>" + sp1.nomeComune + "</th><th>" + sp2.nomeComune + "</th></tr></thead><tbody>";
+
+        mappatura.forEach(item => {
+            const val1 = sp1[item.colonna] || "Dato non presente";
+            const val2 = sp2[item.colonna] || "Dato non presente";
+            
+            const testoPulito1 = val1.toString().trim().toLowerCase();
+            const testoPulito2 = val2.toString().trim().toLowerCase();
+            
+            const sonoDiverse = testoPulito1 !== testoPulito2;
+            
+            const classeRiga = sonoDiverse ? 'differenza' : 'uguale';
+            const badge = sonoDiverse ? ' <span class="badge-diff">DIFF</span>' : '';
+
+            let imgHtml1 = "";
+            let imgHtml2 = "";
+            
+            // Carica l'immagine solo se per questa riga è definita una cartella (folder)
+            if (item.folder) {
+                if (sp1.id) {
+                    imgHtml1 = `<img class='img-botanica' src='immagini/${item.folder}/${sp1.id.trim()}.jpg' onerror='this.style.display="none";'>`;
+                }
+                if (sp2.id) {
+                    imgHtml2 = `<img class='img-botanica' src='immagini/${item.folder}/${sp2.id.trim()}.jpg' onerror='this.style.display="none";'>`;
+                }
+            }
+
+            // Se è un tag sintetico, mettiamo il testo in evidenza visiva (es. in grassetto o corsivo)
+            const formattazioneTesto = !item.folder ? "font-weight: bold; color: #2e7d32;" : "";
+
+            tabularHtml += "<tr class='" + classeRiga + "'><td><strong>" + item.etichetta + "</strong>" + badge + "</td><td><div style='" + formattazioneTesto + "'>" + val1 + "</div>" + imgHtml1 + "</td><td><div style='" + formattazioneTesto + "'>" + val2 + "</div>" + imgHtml2 + "</td></tr>";
+        });
+
+        tabularHtml += "</tbody></table>";
+        divRisultato.innerHTML = tabularHtml;
+    }
+    
+    function filtraSpecie() {
+        if(databaseAlberi.length === 0) return;
+
+        const filtroMargine = document.getElementById('filtro-margine').value.toLowerCase().trim();
+        const filtroDisposizione = document.getElementById('filtro-disposizione').value.toLowerCase().trim();
+        const filtroCorteccia = document.getElementById('filtro-corteccia').value.toLowerCase().trim();
+        const filtroFrutto = document.getElementById('filtro-frutto').value.toLowerCase().trim();
+        
+        const risultatiDiv = document.getElementById('lista-identificati');
+        const contatoreDiv = document.getElementById('contatore-risultati');
+        
+        if(!risultatiDiv || !contatoreDiv) return;
+
+        // Filtro dinamico sui dati del CSV
+        const specieFiltrateReali = databaseAlberi.filter(albero => {
+            if (!albero.id) return false;
+            const tM = tendernessTrim(albero.tagMargine);
+            const tD = tendernessTrim(albero.tagDisposizione);
+            const tC = tendernessTrim(albero.tagCorteccia);
+            const tF = tendernessTrim(albero.tagFrutto);
+            return (filtroMargine === "tutti" || tM.includes(filtroMargine)) &&
+                (filtroDisposizione === "tutti" || tD.includes(filtroDisposizione)) &&
+                (filtroCorteccia === "tutti" || tC.includes(filtroCorteccia)) &&
+                (filtroFrutto === "tutti" || tF.includes(filtroFrutto));
+        });
+
+        contatoreDiv.textContent = "Specie compatibili trovate: " + specieFiltrateReali.length;
+
+        if(specieFiltrateReali.length === 0) {
+            risultatiDiv.innerHTML = "<p style='text-align:center; color:#999; margin-top:20px;'>Nessuna specie corrisponde a questa combinazione di caratteri.</p>";
+            return;
+        }
+
+        let elencoHtml = "";
+        specieFiltrateReali.forEach(albero => {
+            let idPulito = albero.id.trim();
+
+            elencoHtml += "<div class='card-risultato' style='flex-direction: column; gap: 10px;'>";
+            elencoHtml += "<div><h4>" + albero.nomeComune + "</h4>";
+            elencoHtml += "<p style='font-style: italic; margin: 0 0 10px 0; color: #666;'>" + albero.nomeScientifico + "</p>";
+            elencoHtml += "<p style='font-size: 14px; margin: 4px 0;'><strong>Foglia:</strong> " + (albero.descrizioneFoglia || '') + "</p>";
+            elencoHtml += "<p style='font-size: 14px; margin: 4px 0;'><strong>Corteccia:</strong> " + (albero.descrizioneCorteccia || '') + "</p>";
+            elencoHtml += "<p style='font-size: 14px; margin: 4px 0;'><strong>Frutto:</strong> " + (albero.descrizioneFrutto || '') + "</p></div>";
+            elencoHtml += "<p style='font-size: 14px; margin: 4px 0;'><strong>Chioma/Portamento:</strong> " + (albero.descrizioneChioma || '') + "</p></div>";
+            
+            elencoHtml += "<div><button class='btn-esporta' onclick='esportaReport(\"" + idPulito + "\")'>💾 Salva nel Diario di Campo</button></div>";
+            
+            // =========================================================================
+            // QUI VA INSERITA LA PARTE B (LA NUOVA GRIGLIA A 5 COLONNE AUTOMATIZZATA):
+            elencoHtml += "<div style='display: flex; gap: 8px; margin-top: 10px; overflow-x: auto;'>";
+            
+            elencoHtml += `<div style='flex: 1; min-width: 75px; text-align: center;'><span style='font-size: 10px; color: #666; font-weight: bold; display: block; margin-bottom: 2px;'>FOGLIA</span><img src='immagini/foglie/${idPulito}.jpg' class='img-botanica' style='margin:0; width:100%;' onerror='this.parentNode.style.display="none";'></div>`;
+            elencoHtml += `<div style='flex: 1; min-width: 75px; text-align: center;'><span style='font-size: 10px; color: #666; font-weight: bold; display: block; margin-bottom: 2px;'>DETT. FOGLIA</span><img src='immagini/foglie_dettaglio/${idPulito}.jpg' class='img-botanica' style='margin:0; width:100%;' onerror='this.parentNode.style.display="none";'></div>`;
+            elencoHtml += `<div style='flex: 1; min-width: 75px; text-align: center;'><span style='font-size: 10px; color: #666; font-weight: bold; display: block; margin-bottom: 2px;'>TRONCO</span><img src='immagini/tronchi/${idPulito}.jpg' class='img-botanica' style='margin:0; width:100%;' onerror='this.parentNode.style.display="none";'></div>`;
+            elencoHtml += `<div style='flex: 1; min-width: 75px; text-align: center;'><span style='font-size: 10px; color: #666; font-weight: bold; display: block; margin-bottom: 2px;'>FRUTTO</span><img src='immagini/frutti/${idPulito}.jpg' class='img-botanica' style='margin:0; width:100%;' onerror='this.parentNode.style.display="none";'></div>`;
+            elencoHtml += `<div style='flex: 1; min-width: 75px; text-align: center;'><span style='font-size: 10px; color: #666; font-weight: bold; display: block; margin-bottom: 2px;'>CHIOMA</span><img src='immagini/chiome/${idPulito}.jpg' class='img-botanica' style='margin:0; width:100%;' onerror='this.parentNode.style.display="none";'></div>`;
+            
+            elencoHtml += "</div>";
+            // =========================================================================
+
+            elencoHtml += "</div>";
+        });
+        
+        risultatiDiv.innerHTML = elencoHtml;
+    }
+    
+    async function esportaReport(alberoId) {
+        const albero = databaseAlberi.find(a => a.id && a.id.trim() === alberoId);
+        if (!albero) return;
+    
+        const dataOggi = new Date().toLocaleString('it-IT');
+        
+        let testoReport = `==================================================\n`;
+        testoReport += `         REPORT DIARIO DI CAMPO BOTANICO          \n`;
+        testoReport += `==================================================\n`;
+        testoReport += `Data Rilevamento  : ${dataOggi}\n`;
+        testoReport += `Nome Comune       : ${albero.nomeComune}\n`;
+        testoReport += `Nome Scientifico  : ${albero.nomeScientifico}\n`;
+        testoReport += `--------------------------------------------------\n`;
+        testoReport += `CRITERI CHIAVE DICOTOMICA SELEZIONATI:\n`;
+        testoReport += `- Margine Foglia  : ${albero.tagMargine || 'Non specificato'}\n`;
+        testoReport += `- Disposizione     : ${albero.tagDisposizione || 'Non specificato'}\n`;
+        testoReport += `- Tipo Corteccia  : ${albero.tagCorteccia || 'Non specificato'}\n`;
+        testoReport += `- Tipo Frutto     : ${albero.tagFrutto || 'Non specificato'}\n`;
+        testoReport += `--------------------------------------------------\n`;
+        testoReport += `DESCRIZIONI MORFOLOGICHE REGISTRATE:\n\n`;
+        testoReport += `[FOGLIA]:\n${albero.descrizioneFoglia || 'Nessuna descrizione.'}\n\n`;
+        testoReport += `[CORTECCIA/TRONCO]:\n${albero.descrizioneCorteccia || 'Nessuna descrizione.'}\n\n`;
+        testoReport += `[FRUTTO/CHIOMA]:\n${albero.descrizioneFrutto || 'Nessuna descrizione.'}\n`;
+        testoReport += `==================================================\n`;
+    
+        const nomeFile = `Rilevamento_${albero.id}_${new Date().toISOString().slice(0,10)}.txt`;
+
+        // Dentro l'app Android nativa: scrive il file davvero e apre il menu
+        // di condivisione di sistema, così l'utente sceglie dove salvarlo
+        // (Drive, Files, email, WhatsApp...).
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            try {
+                const { Filesystem, Share } = window.Capacitor.Plugins;
+                const fileScritto = await Filesystem.writeFile({
+                    path: nomeFile,
+                    data: testoReport,
+                    directory: 'CACHE',
+                    encoding: 'utf8'
+                });
+
+                await Share.share({
+                    title: 'Report Diario di Campo',
+                    text: `Rilevamento: ${albero.nomeComune}`,
+                    url: fileScritto.uri,
+                    dialogTitle: 'Salva o condividi il report'
+                });
+            } catch (err) {
+                alert('Errore durante il salvataggio del report: ' + err.message);
+            }
+            return;
+        }
+
+        // Fallback per i test da browser desktop (comportamento originale)
+        const blob = new Blob([testoReport], { type: "text/plain;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = nomeFile;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
+
+<div style="text-align:center; padding:8px; font-size:11px; color:#999;">
+    Build: __BUILD_INFO__
+</div>
+
+</body>
+</html>
