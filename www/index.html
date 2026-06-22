@@ -518,16 +518,18 @@
             return;
         }
         try {
-            const { Camera, Filesystem } = window.Capacitor.Plugins;
-            const foto = await Camera.takePhoto({
+            const { Camera } = window.Capacitor.Plugins;
+            const foto = await Camera.getPhoto({
                 quality: 80,
                 allowEditing: false,
-                saveToGallery: false
+                resultType: 'base64',
+                source: 'CAMERA'
             });
-            const fileData = await Filesystem.readFile({ path: foto.path });
-            const base64 = fileData.data;
+
+            const base64 = foto.base64String;
             if (!fotoPerSpecie[alberoId]) fotoPerSpecie[alberoId] = [];
             fotoPerSpecie[alberoId].push(base64);
+
             const contenitore = document.getElementById('foto-' + alberoId);
             if (contenitore) {
                 const img = document.createElement('img');
@@ -535,6 +537,10 @@
                 img.style.cssText = 'width:70px; height:70px; object-fit:cover; border-radius:6px; border:2px solid #2e7d32;';
                 contenitore.appendChild(img);
             }
+        } catch (err) {
+            if (err.message && err.message.includes('canceled')) return;
+            console.error('Errore fotocamera:', err);
+            alert('Errore fotocamera: ' + err.message);
         } catch (err) {
             if (err.message && err.message.includes('canceled')) return;
             console.error('Errore fotocamera:', err);
