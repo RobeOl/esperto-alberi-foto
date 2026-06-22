@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Esperto Botanico Forestale</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --primary: #2e7d32;
@@ -484,8 +485,12 @@
             elencoHtml += "<p style='font-size: 14px; margin: 4px 0;'><strong>Frutto:</strong> " + (albero.descrizioneFrutto || '') + "</p></div>";
             elencoHtml += "<p style='font-size: 14px; margin: 4px 0;'><strong>Chioma/Portamento:</strong> " + (albero.descrizioneChioma || '') + "</p></div>";
             
-            elencoHtml += "<div><button class='btn-esporta' onclick='esportaReport(\"" + idPulito + "\")'>💾 Salva nel Diario di Campo</button></div>";
-            
+            elencoHtml += "<div style='margin-top:10px;'>";
+            elencoHtml += "<button class='btn-esporta' onclick='aggiungiPhoto(\"" + idPulito + "\")'>📷 Aggiungi foto</button> ";
+            elencoHtml += "<button class='btn-esporta' onclick='esportaReport(\"" + idPulito + "\")'>💾 Salva nel Diario di Campo</button>";
+            elencoHtml += "</div>";
+            elencoHtml += "<div id='foto-" + idPulito + "' style='display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;'></div>";
+
             // =========================================================================
             // QUI VA INSERITA LA PARTE B (LA NUOVA GRIGLIA A 5 COLONNE AUTOMATIZZATA):
             elencoHtml += "<div style='display: flex; gap: 8px; margin-top: 10px; overflow-x: auto;'>";
@@ -505,69 +510,150 @@
         risultatiDiv.innerHTML = elencoHtml;
     }
     
+    const fotoPerSpecie = {};
+
+    async function aggiungiPhoto(alberoId) {
+        if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
+            alert("La fotocamera è disponibile solo nell'app Android.");
+            return;
+        }
+        try {
+            const { Camera, Filesystem } = window.Capacitor.Plugins;
+            const foto = await Camera.takePhoto({
+                quality: 80,
+                allowEditing: false,
+                saveToGallery: false
+            });
+            const fileData = await Filesystem.readFile({ path: foto.path });
+            const base64 = fileData.data;
+            if (!fotoPerSpecie[alberoId]) fotoPerSpecie[alberoId] = [];
+            fotoPerSpecie[alberoId].push(base64);
+            const contenitore = document.getElementById('foto-' + alberoId);
+            if (contenitore) {
+                const img = document.createElement('img');
+                img.src = 'data:image/jpeg;base64,' + base64;
+                img.style.cssText = 'width:70px; height:70px; object-fit:cover; border-radius:6px; border:2px solid #2e7d32;';
+                contenitore.appendChild(img);
+            }
+        } catch (err) {
+            if (err.message && err.message.includes('canceled')) return;
+            console.error('Errore fotocamera:', err);
+            alert('Errore fotocamera: ' + err.message);
+        }
+    }
+
     async function esportaReport(alberoId) {
         const albero = databaseAlberi.find(a => a.id && a.id.trim() === alberoId);
         if (!albero) return;
-    
-        const dataOggi = new Date().toLocaleString('it-IT');
-        
-        let testoReport = `==================================================\n`;
-        testoReport += `         REPORT DIARIO DI CAMPO BOTANICO          \n`;
-        testoReport += `==================================================\n`;
-        testoReport += `Data Rilevamento  : ${dataOggi}\n`;
-        testoReport += `Nome Comune       : ${albero.nomeComune}\n`;
-        testoReport += `Nome Scientifico  : ${albero.nomeScientifico}\n`;
-        testoReport += `--------------------------------------------------\n`;
-        testoReport += `CRITERI CHIAVE DICOTOMICA SELEZIONATI:\n`;
-        testoReport += `- Margine Foglia  : ${albero.tagMargine || 'Non specificato'}\n`;
-        testoReport += `- Disposizione     : ${albero.tagDisposizione || 'Non specificato'}\n`;
-        testoReport += `- Tipo Corteccia  : ${albero.tagCorteccia || 'Non specificato'}\n`;
-        testoReport += `- Tipo Frutto     : ${albero.tagFrutto || 'Non specificato'}\n`;
-        testoReport += `--------------------------------------------------\n`;
-        testoReport += `DESCRIZIONI MORFOLOGICHE REGISTRATE:\n\n`;
-        testoReport += `[FOGLIA]:\n${albero.descrizioneFoglia || 'Nessuna descrizione.'}\n\n`;
-        testoReport += `[CORTECCIA/TRONCO]:\n${albero.descrizioneCorteccia || 'Nessuna descrizione.'}\n\n`;
-        testoReport += `[FRUTTO/CHIOMA]:\n${albero.descrizioneFrutto || 'Nessuna descrizione.'}\n`;
-        testoReport += `==================================================\n`;
-    
-        const nomeFile = `Rilevamento_${albero.id}_${new Date().toISOString().slice(0,10)}.txt`;
 
-        // Dentro l'app Android nativa: scrive il file davvero e apre il menu
-        // di condivisione di sistema, così l'utente sceglie dove salvarlo
-        // (Drive, Files, email, WhatsApp...).
+        const dataOggi = new Date().toLocaleString('it-IT');
+        const foto = fotoPerSpecie[alberoId] || [];
+        const nomeFile = `Rilevamento_${albero.id}_${new Date().toISOString().slice(0,10)}.pdf`;
+
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+                const W = doc.internal.pageSize.getWidth();
+                let y = 15;
+
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.text('REPORT DIARIO DI CAMPO BOTANICO', W / 2, y, { align: 'center' });
+                y += 8;
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Data: ${dataOggi}`, 15, y); y += 6;
+
+                doc.setFontSize(13);
+                doc.setFont('helvetica', 'bold');
+                doc.text(albero.nomeComune, 15, y); y += 6;
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'italic');
+                doc.text(albero.nomeScientifico, 15, y); y += 8;
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.text('Criteri chiave dicotomica:', 15, y); y += 5;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                [
+                    ['Margine foglia', albero.tagMargine],
+                    ['Disposizione', albero.tagDisposizione],
+                    ['Corteccia', albero.tagCorteccia],
+                    ['Frutto', albero.tagFrutto]
+                ].forEach(([label, val]) => {
+                    doc.text(`  \u2022 ${label}: ${val || 'Non specificato'}`, 15, y); y += 5;
+                });
+                y += 3;
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.text('Descrizioni morfologiche:', 15, y); y += 5;
+                [
+                    ['Foglia', albero.descrizioneFoglia],
+                    ['Corteccia/Tronco', albero.descrizioneCorteccia],
+                    ['Frutto/Chioma', albero.descrizioneFrutto]
+                ].forEach(([label, testo]) => {
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10);
+                    doc.text(label + ':', 15, y); y += 5;
+                    doc.setFont('helvetica', 'normal');
+                    const righe = doc.splitTextToSize(testo || 'Nessuna descrizione.', W - 30);
+                    righe.forEach(riga => {
+                        if (y > 270) { doc.addPage(); y = 15; }
+                        doc.text(riga, 15, y); y += 5;
+                    });
+                    y += 3;
+                });
+
+                if (foto.length > 0) {
+                    if (y > 200) { doc.addPage(); y = 15; }
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(11);
+                    doc.text(`Foto di campo (${foto.length}):`, 15, y); y += 6;
+                    const larghFoto = (W - 40) / 2;
+                    const altFoto = larghFoto * 0.75;
+                    let col = 0;
+                    for (const b64 of foto) {
+                        if (y + altFoto > 280) { doc.addPage(); y = 15; col = 0; }
+                        const x = 15 + col * (larghFoto + 10);
+                        doc.addImage('data:image/jpeg;base64,' + b64, 'JPEG', x, y, larghFoto, altFoto);
+                        col++;
+                        if (col === 2) { col = 0; y += altFoto + 5; }
+                    }
+                    if (col === 1) y += altFoto + 5;
+                }
+
+                const pdfBase64 = doc.output('datauristring').split(',')[1];
                 const { Filesystem, Share } = window.Capacitor.Plugins;
                 const fileScritto = await Filesystem.writeFile({
                     path: nomeFile,
-                    data: testoReport,
-                    directory: 'CACHE',
-                    encoding: 'utf8'
+                    data: pdfBase64,
+                    directory: 'CACHE'
                 });
-
                 await Share.share({
                     title: 'Report Diario di Campo',
                     text: `Rilevamento: ${albero.nomeComune}`,
                     url: fileScritto.uri,
-                    dialogTitle: 'Salva o condividi il report'
+                    dialogTitle: 'Salva o condividi il report PDF'
                 });
             } catch (err) {
-                if (err.message && err.message.includes("canceled")) return;
-                alert('Errore durante il salvataggio del report: ' + err.message);
+                if (err.message && err.message.includes('canceled')) return;
+                console.error('Errore salvataggio report PDF:', err);
+                alert('Errore: ' + err.message);
             }
             return;
         }
 
-        // Fallback per i test da browser desktop (comportamento originale)
-        const blob = new Blob([testoReport], { type: "text/plain;charset=utf-8" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = nomeFile;
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Fallback browser desktop
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        doc.text('Report: ' + albero.nomeComune, 15, 20);
+        doc.save(nomeFile);
     }
+
+
     </script>
 
 </body>
